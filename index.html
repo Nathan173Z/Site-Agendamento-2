@@ -3,6 +3,7 @@
 <html lang="pt-BR">
   <head>
     <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>💅</text></svg>" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>LG Nails Studio | Premium Beauty</title>
     <script src="https://cdn.tailwindcss.com"></script>
@@ -17,6 +18,7 @@
         font-family: 'Inter', sans-serif;
         background-color: var(--bg-soft);
         color: #27272a;
+        overflow-x: hidden;
       }
       h1, h2, h3, .serif {
         font-family: 'Playfair Display', serif;
@@ -47,14 +49,12 @@
         from { opacity: 0; transform: translateY(20px); }
         to { opacity: 1; transform: translateY(0); }
       }
-      .animate-slide-up { animation: slideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+      .animate-slide-up { animation: slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
       
-      /* Smooth radio/checkbox transitions */
-      input[type="checkbox"]:checked + label {
-        border-color: #18181b;
-        background-color: #18181b;
-        color: white;
-      }
+      /* Scrollbar Custom */
+      ::-webkit-scrollbar { width: 6px; }
+      ::-webkit-scrollbar-track { background: transparent; }
+      ::-webkit-scrollbar-thumb { background: #E0BFB8; border-radius: 10px; }
     </style>
     <script type="importmap">
 {
@@ -64,7 +64,9 @@
     "react-dom/client": "https://esm.sh/react-dom@19.0.0/client",
     "lucide-react": "https://esm.sh/lucide-react@0.463.0",
     "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
-    "react/": "https://esm.sh/react@^19.2.4/"
+    "react/": "https://esm.sh/react@^19.2.4/",
+    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.4",
+    "vite": "https://esm.sh/vite@^7.3.1"
   }
 }
 </script>
