@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Calendar, 
   Clock, 
@@ -10,25 +10,19 @@ import {
   LogOut, 
   Settings, 
   LayoutDashboard, 
-  Instagram, 
-  MapPin, 
   Sparkles, 
-  ChevronRight, 
   Loader2, 
   AlertCircle,
-  RefreshCcw,
   User,
-  Phone,
   Brush,
   Palette,
   Droplets,
   Check,
-  Wallet,
-  TrendingUp,
-  ArrowRight
+  MinusCircle,
+  X
 } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
-import { Appointment, Service, AppointmentStatus } from './types';
+import { Appointment, Service } from './types';
 
 // Mock de Serviços Iniciais
 const INITIAL_SERVICES: Service[] = [
@@ -72,9 +66,16 @@ const Toast: React.FC<{ message: string; type: 'success' | 'error' | 'warning'; 
   );
 };
 
-const Modal: React.FC<{ isOpen: boolean; title: string; message: string; onConfirm: () => void; onCancel: () => void }> = ({ 
-  isOpen, title, message, onConfirm, onCancel 
-}) => {
+interface ModalProps {
+  isOpen: boolean;
+  title: string;
+  message: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+  type?: string;
+}
+
+const Modal: React.FC<ModalProps> = ({ isOpen, title, message, onConfirm, onCancel }) => {
   if (!isOpen) return null;
   return (
     <div className="fixed inset-0 z-[190] flex items-center justify-center bg-zinc-900/60 backdrop-blur-sm px-4">
@@ -107,7 +108,7 @@ export default function App() {
   // Estados de UI
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'warning' } | null>(null);
-  const [modal, setModal] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
+  const [modalConfig, setModalConfig] = useState<{ type: string; title: string; message: string; data?: any } | null>(null);
 
   // Estados Form Cliente
   const [selectedServices, setSelectedServices] = useState<Service[]>([]);
@@ -116,6 +117,9 @@ export default function App() {
   const [clientName, setClientName] = useState('');
   const [clientPhone, setClientPhone] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Estado para novo horário
+  const [newSlotTime, setNewSlotTime] = useState('');
 
   useEffect(() => {
     setTimeout(() => setLoading(false), 1200);
@@ -132,14 +136,17 @@ export default function App() {
     duration: `${selectedServices.reduce((acc, s) => acc + parseInt(s.duration), 0)} min`
   }), [selectedServices]);
 
+  const allSlotsSorted = useMemo(() => {
+    return Array.from(new Set([...DEFAULT_SLOTS, ...customSlots])).sort((a, b) => a.localeCompare(b));
+  }, [customSlots]);
+
   const availableSlots = useMemo(() => {
     if (!selectedDate || blockedDates.includes(selectedDate)) return [];
-    const all = Array.from(new Set([...DEFAULT_SLOTS, ...customSlots])).sort();
-    return all.filter(s => !blockedSlots.includes(s)).map(time => ({
+    return allSlotsSorted.filter(s => !blockedSlots.includes(s)).map(time => ({
       time,
       isTaken: appointments.some(a => a.date === selectedDate && a.time === time && (a.status === 'confirmed' || a.status === 'pending'))
     }));
-  }, [selectedDate, blockedDates, blockedSlots, customSlots, appointments]);
+  }, [selectedDate, blockedDates, blockedSlots, allSlotsSorted, appointments]);
 
   const stats = useMemo(() => {
     const today = new Date().toISOString().split('T')[0];
@@ -187,6 +194,56 @@ export default function App() {
     const text = `Olá ${apt.clientName}, sinto muito, mas não poderei atender no horário solicitado. Vamos marcar outra data?`;
     window.open(`https://wa.me/${apt.phone.replace(/\D/g, '')}?text=${encodeURIComponent(text)}`, '_blank');
     showToast('Recusado.', 'warning');
+  };
+
+  const initiateDeleteService = (id: string) => {
+    const service = services.find(s => s.id === id);
+    if (service) {
+      setModalConfig({
+        type: 'DELETE_SERVICE',
+        title: 'Excluir Serviço',
+        message: `Tem certeza que deseja remover "${service.name}"? Esta ação não pode ser desfeita.`,
+        data: id
+      });
+    }
+  };
+
+  const handleModalConfirm = () => {
+    if (!modalConfig) return;
+
+    if (modalConfig.type === 'DELETE_SERVICE') {
+      const serviceId = modalConfig.data;
+      setServices(prev => prev.filter(s => s.id !== serviceId));
+      showToast('Serviço excluído com sucesso.');
+    } else if (modalConfig.type === 'DELETE_APPOINTMENT') {
+        const apt = modalConfig.data;
+        setAppointments(prev => prev.filter(a => a !== apt));
+        showToast('Agendamento removido.');
+    }
+
+    setModalConfig(null);
+  };
+
+  const addCustomSlot = () => {
+    if (!newSlotTime) return;
+    if (allSlotsSorted.includes(newSlotTime)) {
+      showToast('Este horário já existe na grade.', 'warning');
+      return;
+    }
+    setCustomSlots(prev => [...prev, newSlotTime]);
+    setNewSlotTime('');
+    showToast('Horário adicionado com sucesso!');
+  };
+
+  const removeCustomSlot = (time: string) => {
+    setCustomSlots(prev => prev.filter(t => t !== time));
+    showToast('Horário personalizado removido.');
+  };
+
+  const toggleSlotBlock = (time: string) => {
+    setBlockedSlots(prev => 
+      prev.includes(time) ? prev.filter(t => t !== time) : [...prev, time]
+    );
   };
 
   if (loading) return (
@@ -276,30 +333,30 @@ export default function App() {
                   <div className="space-y-4">
                     <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Escolha a Data</label>
                     <input type="date" min={new Date().toISOString().split('T')[0]} value={selectedDate} onChange={e => setSelectedDate(e.target.value)}
-                      className="w-full p-5 bg-[#FAF7F6] border border-[#F4E4E1] rounded-2xl" />
+                      className="w-full p-5 bg-[#FAF7F6] border border-[#F4E4E1] rounded-2xl outline-none focus:border-zinc-900 transition-all" />
                   </div>
                   <div className="space-y-4">
                     <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Horário Disponível</label>
                     <div className="grid grid-cols-3 gap-2">
-                      {availableSlots.map(s => (
+                      {availableSlots.length > 0 ? availableSlots.map(s => (
                         <button key={s.time} type="button" disabled={s.isTaken} onClick={() => setSelectedTime(s.time)}
                           className={`py-3 rounded-xl text-xs font-bold transition-all ${s.isTaken ? 'bg-zinc-50 text-zinc-200 line-through' : selectedTime === s.time ? 'bg-zinc-900 text-white' : 'bg-[#FAF7F6] hover:bg-[#E0BFB8]'}`}>
                           {s.time}
                         </button>
-                      ))}
+                      )) : <p className="col-span-3 text-center text-xs text-zinc-400 py-4">Selecione uma data válida.</p>}
                     </div>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
                   <input type="text" placeholder="Nome Completo" required value={clientName} onChange={e => setClientName(e.target.value)}
-                    className="w-full p-5 bg-[#FAF7F6] border border-[#F4E4E1] rounded-2xl" />
+                    className="w-full p-5 bg-[#FAF7F6] border border-[#F4E4E1] rounded-2xl outline-none focus:border-zinc-900 transition-all" />
                   <input type="tel" placeholder="WhatsApp (DDD)" required value={clientPhone} onChange={e => setClientPhone(e.target.value)}
-                    className="w-full p-5 bg-[#FAF7F6] border border-[#F4E4E1] rounded-2xl" />
+                    className="w-full p-5 bg-[#FAF7F6] border border-[#F4E4E1] rounded-2xl outline-none focus:border-zinc-900 transition-all" />
                 </div>
 
                 <button type="submit" disabled={isSubmitting || !selectedTime || !selectedServices.length}
-                  className="w-full py-6 bg-zinc-900 text-white rounded-3xl font-bold uppercase text-[10px] tracking-widest shadow-2xl hover:bg-zinc-800 transition-all">
+                  className="w-full py-6 bg-zinc-900 text-white rounded-3xl font-bold uppercase text-[10px] tracking-widest shadow-2xl hover:bg-zinc-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
                   {isSubmitting ? 'Agendando...' : 'Solicitar Horário Premium'}
                 </button>
               </form>
@@ -325,90 +382,134 @@ export default function App() {
               </button>
             </nav>
             <div className="mt-auto space-y-4">
-              <button onClick={() => setView('client')} className="w-full flex items-center p-5 text-zinc-400 text-[10px] font-bold uppercase tracking-widest"><LogOut className="w-4 h-4 mr-3" /> Sair</button>
+              <button onClick={() => { setIsAdminLoggedIn(false); setView('client'); }} className="w-full flex items-center p-5 text-zinc-400 text-[10px] font-bold uppercase tracking-widest hover:text-red-400 transition-colors"><LogOut className="w-4 h-4 mr-3" /> Sair</button>
             </div>
           </aside>
 
           {/* Admin Main Content */}
-          <main className="flex-grow p-6 lg:p-12">
+          <main className="flex-grow p-6 lg:p-12 overflow-y-auto">
             {adminTab === 'agenda' ? (
               <div className="max-w-5xl mx-auto space-y-12 animate-slide-up">
                 <div className="flex flex-col md:flex-row justify-between gap-6 items-start md:items-end">
-                  <div><h1 className="text-4xl font-bold serif">Painel de Controle</h1><p className="text-zinc-400 font-medium">Gestão em tempo real.</p></div>
+                  <div><h1 className="text-4xl font-bold serif text-zinc-900">Painel de Controle</h1><p className="text-zinc-400 font-medium">Gestão em tempo real.</p></div>
                   <div className="flex gap-4">
-                    <div className="bg-white p-6 rounded-[2.5rem] border border-[#F4E4E1]"><span className="text-[9px] font-bold text-[#E0BFB8] block mb-1">RECEITA HOJE</span><span className="text-2xl font-bold">R$ {stats.revenue}</span></div>
-                    <div className="bg-zinc-900 p-6 rounded-[2.5rem] text-white"><span className="text-[9px] font-bold text-zinc-500 block mb-1">PENDENTES</span><span className="text-2xl font-bold text-[#E0BFB8]">{stats.pending}</span></div>
+                    <div className="bg-white p-6 rounded-[2.5rem] border border-[#F4E4E1] shadow-sm"><span className="text-[9px] font-bold text-[#E0BFB8] block mb-1 uppercase tracking-widest">RECEITA HOJE</span><span className="text-2xl font-bold text-zinc-900">R$ {stats.revenue}</span></div>
+                    <div className="bg-zinc-900 p-6 rounded-[2.5rem] text-white shadow-xl"><span className="text-[9px] font-bold text-zinc-500 block mb-1 uppercase tracking-widest">PENDENTES</span><span className="text-2xl font-bold text-[#E0BFB8]">{stats.pending}</span></div>
                   </div>
                 </div>
 
                 {/* Pendentes */}
                 <section className="space-y-6">
-                  <h2 className="text-xl font-bold serif">Solicitações Recentes</h2>
-                  {appointments.filter(a => a.status === 'pending').map((a, i) => (
-                    <div key={i} className="bg-white p-8 rounded-[3rem] border border-[#F4E4E1] flex flex-col md:flex-row gap-8 items-center shadow-sm">
+                  <h2 className="text-xl font-bold serif text-zinc-900">Solicitações Recentes</h2>
+                  {appointments.filter(a => a.status === 'pending').length > 0 ? appointments.filter(a => a.status === 'pending').map((a, i) => (
+                    <div key={i} className="bg-white p-8 rounded-[3rem] border border-[#F4E4E1] flex flex-col md:flex-row gap-8 items-center shadow-sm hover:shadow-md transition-shadow">
                       <div className="flex-grow">
-                        <div className="flex items-center gap-2 mb-2"><span className="text-xl font-bold">{a.clientName}</span><span className="px-2 py-1 bg-amber-50 text-amber-600 text-[8px] font-bold rounded uppercase">Aguardando</span></div>
-                        <div className="flex flex-wrap gap-2 text-[10px] font-bold text-zinc-400 uppercase">
+                        <div className="flex items-center gap-2 mb-2"><span className="text-xl font-bold text-zinc-900">{a.clientName}</span><span className="px-2 py-1 bg-amber-50 text-amber-600 text-[8px] font-bold rounded uppercase">Aguardando</span></div>
+                        <div className="flex flex-wrap gap-2 text-[10px] font-bold text-zinc-400 uppercase tracking-widest">
                           <span>{a.date}</span><span>•</span><span>{a.time}</span><span>•</span><span>R$ {a.totalPrice}</span>
                         </div>
+                        <p className="mt-2 text-xs text-zinc-500 font-medium">{a.services.join(', ')}</p>
                       </div>
                       <div className="flex gap-2">
-                        <button onClick={() => approveApt(a)} className="p-4 bg-[#E0BFB8] text-zinc-900 rounded-2xl font-bold text-[9px] uppercase tracking-widest">Aprovar</button>
-                        <button onClick={() => refuseApt(a)} className="p-4 bg-white border border-red-100 text-red-400 rounded-2xl font-bold text-[9px] uppercase tracking-widest">Recusar</button>
+                        <button onClick={() => approveApt(a)} className="px-6 py-4 bg-[#E0BFB8] text-zinc-900 rounded-2xl font-bold text-[9px] uppercase tracking-widest hover:brightness-95 transition-all">Aprovar</button>
+                        <button onClick={() => refuseApt(a)} className="px-6 py-4 bg-white border border-red-100 text-red-400 rounded-2xl font-bold text-[9px] uppercase tracking-widest hover:bg-red-50 transition-all">Recusar</button>
                       </div>
                     </div>
-                  ))}
+                  )) : <p className="text-zinc-400 text-sm italic">Nenhuma solicitação pendente.</p>}
                 </section>
 
                 {/* Agenda Confirmada */}
                 <section className="space-y-6">
-                  <h2 className="text-xl font-bold serif">Próximos Atendimentos</h2>
-                  {appointments.filter(a => a.status === 'confirmed').sort((a,b) => a.time.localeCompare(b.time)).map((a, i) => (
+                  <h2 className="text-xl font-bold serif text-zinc-900">Próximos Atendimentos</h2>
+                  {appointments.filter(a => a.status === 'confirmed').length > 0 ? appointments.filter(a => a.status === 'confirmed').sort((a,b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time)).map((a, i) => (
                     <div key={i} className="bg-zinc-900 p-8 rounded-[3rem] flex items-center justify-between shadow-xl">
                       <div className="text-white">
                         <span className="text-lg font-bold block">{a.clientName}</span>
-                        <span className="text-[10px] font-bold text-zinc-500 uppercase">{a.time} • {a.services.join(' + ')}</span>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">{a.date} • {a.time}</span>
+                          <span className="text-[9px] px-2 py-0.5 bg-zinc-800 text-[#E0BFB8] rounded-full font-bold">{a.services.join(' + ')}</span>
+                        </div>
                       </div>
-                      <button onClick={() => setAppointments(p => p.filter(x => x !== a))} className="w-12 h-12 bg-zinc-800 text-red-400 rounded-xl hover:bg-red-500 hover:text-white transition-all flex items-center justify-center">
+                      <button onClick={() => setModalConfig({ type: 'DELETE_APPOINTMENT', title: 'Excluir Agendamento', message: 'Deseja remover este atendimento?', data: a })} className="w-12 h-12 bg-zinc-800 text-red-400 rounded-xl hover:bg-red-500 hover:text-white transition-all flex items-center justify-center">
                         <Trash2 className="w-5 h-5" />
                       </button>
                     </div>
-                  ))}
+                  )) : <p className="text-zinc-400 text-sm italic">Nenhum atendimento confirmado ainda.</p>}
                 </section>
               </div>
             ) : (
-              <div className="max-w-5xl mx-auto space-y-12 animate-slide-up">
-                <h1 className="text-4xl font-bold serif">Ajustes Globais</h1>
+              <div className="max-w-5xl mx-auto space-y-12 animate-slide-up pb-20">
+                <h1 className="text-4xl font-bold serif text-zinc-900">Ajustes Globais</h1>
                 
                 {/* CRUD Serviços Simplificado */}
-                <section className="bg-white p-10 rounded-[3rem] border border-[#F4E4E1] space-y-8">
-                  <h2 className="text-xl font-bold serif">Gestão de Cardápio</h2>
+                <section className="bg-white p-10 rounded-[3rem] border border-[#F4E4E1] space-y-8 shadow-sm">
+                  <div className="flex justify-between items-center">
+                    <h2 className="text-xl font-bold serif text-zinc-900">Gestão de Cardápio</h2>
+                    <button onClick={() => showToast('Funcionalidade de adição em breve!', 'warning')} className="p-3 bg-zinc-900 text-white rounded-xl hover:bg-zinc-800 transition-all">
+                        <Plus className="w-5 h-5" />
+                    </button>
+                  </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {services.map(s => (
-                      <div key={s.id} className="p-6 bg-[#FAF7F6] rounded-2xl border border-[#F4E4E1] flex items-center justify-between">
-                        <div><span className="font-bold block">{s.name}</span><span className="text-[10px] text-zinc-400 font-bold uppercase">R$ {s.price} • {s.duration}</span></div>
-                        <button onClick={() => setServices(p => p.filter(x => x.id !== s.id))} className="text-red-400"><Trash2 className="w-4 h-4" /></button>
+                      <div key={s.id} className="p-6 bg-[#FAF7F6] rounded-2xl border border-[#F4E4E1] flex items-center justify-between group">
+                        <div>
+                          <span className="font-bold block text-zinc-900">{s.name}</span>
+                          <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-widest">R$ {s.price} • {s.duration}</span>
+                        </div>
+                        <button onClick={() => initiateDeleteService(s.id)} className="text-zinc-300 hover:text-red-400 transition-colors p-2">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
                       </div>
                     ))}
-                    <button onClick={() => setServices(INITIAL_SERVICES)} className="sm:col-span-2 p-5 border border-dashed border-[#F4E4E1] rounded-2xl text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Restaurar Serviços Padrão</button>
+                    <button onClick={() => setServices(INITIAL_SERVICES)} className="sm:col-span-2 p-5 border border-dashed border-[#F4E4E1] rounded-2xl text-[10px] font-bold text-zinc-400 uppercase tracking-[0.2em] hover:bg-[#FAF7F6] transition-all">
+                      Restaurar Serviços Padrão
+                    </button>
                   </div>
                 </section>
 
                 {/* Bloqueio Rápido de Horários */}
-                <section className="bg-white p-10 rounded-[3rem] border border-[#F4E4E1] space-y-8">
-                  <h2 className="text-xl font-bold serif">Grade de Horários Padrão</h2>
-                  <div className="grid grid-cols-4 sm:grid-cols-7 gap-2">
-                    {DEFAULT_SLOTS.map(t => {
-                      const isB = blockedSlots.includes(t);
+                <section className="bg-white p-10 rounded-[3rem] border border-[#F4E4E1] space-y-8 shadow-sm">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                    <div>
+                      <h2 className="text-xl font-bold serif text-zinc-900">Grade de Horários</h2>
+                      <p className="text-[10px] text-zinc-400 uppercase tracking-widest mt-1">Gerencie a disponibilidade padrão do estúdio.</p>
+                    </div>
+                    <div className="flex items-center gap-3 bg-[#FAF7F6] p-3 rounded-2xl border border-[#F4E4E1]">
+                      <input 
+                        type="time" 
+                        value={newSlotTime} 
+                        onChange={(e) => setNewSlotTime(e.target.value)} 
+                        className="bg-transparent text-sm font-bold text-zinc-900 focus:outline-none"
+                      />
+                      <button onClick={addCustomSlot} className="bg-zinc-900 text-white p-2 rounded-lg hover:bg-zinc-800 transition-all">
+                        <Plus className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-4 sm:grid-cols-7 gap-3">
+                    {allSlotsSorted.map(t => {
+                      const isBlocked = blockedSlots.includes(t);
+                      const isCustom = customSlots.includes(t);
                       return (
-                        <button key={t} onClick={() => setBlockedSlots(p => isB ? p.filter(x => x !== t) : [...p, t])}
-                          className={`py-4 rounded-xl text-[10px] font-bold border transition-all ${isB ? 'bg-red-50 border-red-100 text-red-400' : 'bg-white border-[#F4E4E1]'}`}>
-                          {t}
-                        </button>
+                        <div key={t} className="relative group">
+                          <button onClick={() => toggleSlotBlock(t)}
+                            className={`w-full py-4 rounded-xl text-[10px] font-bold border transition-all ${isBlocked ? 'bg-red-50 border-red-100 text-red-400' : 'bg-white border-[#F4E4E1] text-zinc-900 hover:border-zinc-900'}`}>
+                            {t}
+                          </button>
+                          {isCustom && (
+                            <button 
+                              onClick={() => removeCustomSlot(t)}
+                              className="absolute -top-2 -right-2 bg-zinc-900 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
+                            >
+                              <X className="w-2 h-2" />
+                            </button>
+                          )}
+                        </div>
                       );
                     })}
                   </div>
-                  <p className="text-[9px] text-zinc-400 italic font-medium">* Clique para bloquear o horário globalmente.</p>
+                  <p className="text-[10px] text-zinc-400 italic font-medium">* Clique no horário para bloqueá-lo/desbloqueá-lo globalmente. Horários com "X" são personalizados e podem ser removidos.</p>
                 </section>
               </div>
             )}
@@ -417,7 +518,16 @@ export default function App() {
       )}
 
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
-      {modal && <Modal isOpen title={modal.title} message={modal.message} onConfirm={modal.onConfirm} onCancel={() => setModal(null)} />}
+      
+      {modalConfig && (
+        <Modal 
+          isOpen={!!modalConfig}
+          title={modalConfig.title} 
+          message={modalConfig.message} 
+          onConfirm={handleModalConfirm} 
+          onCancel={() => setModalConfig(null)} 
+        />
+      )}
     </div>
   );
 }
