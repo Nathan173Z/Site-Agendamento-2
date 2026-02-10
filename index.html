@@ -1,0 +1,75 @@
+
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LG Nails Studio | Premium Beauty</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+      :root {
+        --rose-gold: #E0BFB8;
+        --nude: #F4E4E1;
+        --bg-soft: #FAF7F6;
+      }
+      body {
+        font-family: 'Inter', sans-serif;
+        background-color: var(--bg-soft);
+        color: #27272a;
+      }
+      h1, h2, h3, .serif {
+        font-family: 'Playfair Display', serif;
+      }
+      .logo-container {
+        position: relative;
+        display: inline-block;
+      }
+      .logo-l {
+        font-size: 2rem;
+        font-family: 'Playfair Display', serif;
+        color: #18181b;
+        position: relative;
+        z-index: 2;
+      }
+      .logo-g {
+        font-size: 2rem;
+        font-family: 'Playfair Display', serif;
+        color: var(--rose-gold);
+        position: absolute;
+        top: 0.2rem;
+        left: 0.5rem;
+        z-index: 1;
+        opacity: 0.8;
+      }
+      
+      @keyframes slideUp {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      .animate-slide-up { animation: slideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+      
+      /* Smooth radio/checkbox transitions */
+      input[type="checkbox"]:checked + label {
+        border-color: #18181b;
+        background-color: #18181b;
+        color: white;
+      }
+    </style>
+    <script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@19.0.0",
+    "react-dom": "https://esm.sh/react-dom@19.0.0",
+    "react-dom/client": "https://esm.sh/react-dom@19.0.0/client",
+    "lucide-react": "https://esm.sh/lucide-react@0.463.0",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
+    "react/": "https://esm.sh/react@^19.2.4/"
+  }
+}
+</script>
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>
